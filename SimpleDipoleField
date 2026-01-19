@@ -12,7 +12,7 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
     private static final double DIPOLE_DISTANCE = 150.0;
 
     private Timer timer;  // Zegar sterujący animacją
-    private double angle = 0.0;  // Zegar sterujący animacją
+    private double angle = 0.0;  // Kąt obrotu
     private double centerX, centerY;  // Środek ekranu
     private double charge1X, charge1Y, charge2X, charge2Y; // Współrzędne ładunków
 
@@ -28,8 +28,8 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
 
         calculatePositions(); // Pierwsze obliczenie pozycji ładunków
     }
-              // --- FIZYKA: RUCH ---
-    // Oblicza pozycje ładunków na okręgu na podstawie kąta (ruch obrotowy)
+
+    // --- FIZYKA: RUCH ---
     private void calculatePositions() {
         // Ładunek dodatni (+)
         charge1X = centerX + (DIPOLE_DISTANCE / 2) * Math.cos(angle);
@@ -38,7 +38,8 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
         charge2X = centerX - (DIPOLE_DISTANCE / 2) * Math.cos(angle);
         charge2Y = centerY - (DIPOLE_DISTANCE / 2) * Math.sin(angle);
     }
-          // --- GRAFIKA: RYSOWANIE ---
+
+    // --- GRAFIKA: RYSOWANIE ---
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -46,7 +47,7 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         drawGrid(g2d);
-        drawElectricFieldWithArrows(g2d); // Zmienione: pole E ze strzałkami
+        drawElectricFieldWithArrows(g2d); // Pole E ze strzałkami
         drawMagneticFieldCircles(g2d);    // Pole B jako okręgi
         drawDipole(g2d);
         drawLabels(g2d);
@@ -56,7 +57,6 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
         g2d.setColor(new Color(40, 40, 60));
         g2d.setStroke(new BasicStroke(0.5f));
 
-    // Rysowanie pionowych i poziomych linii siatki
         for (int x = 50; x < WIDTH; x += 50) {
             g2d.drawLine(x, 0, x, HEIGHT);
         }
@@ -64,7 +64,6 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
             g2d.drawLine(0, y, WIDTH, y);
         }
 
-     // Osie główne (środek ekranu)
         g2d.setColor(new Color(100, 100, 150));
         g2d.setStroke(new BasicStroke(1.5f));
         g2d.drawLine(50, HEIGHT/2, WIDTH-50, HEIGHT/2);
@@ -75,24 +74,25 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
         g2d.drawString("Distance X", WIDTH-80, HEIGHT/2-10);
         g2d.drawString("Distance Y", WIDTH/2+10, 40);
     }
-    // Inicjuje rysowanie wielu linii pola wychodzących z ładunków pod różnymi kątami
+
     private void drawElectricFieldWithArrows(Graphics2D g2d) {
         g2d.setColor(new Color(255, 100, 100, 180));
         g2d.setStroke(new BasicStroke(1.2f));
 
-        int numLines = 24; // Ilość linii pola do narysowania
-        // Pętla dla ładunku dodatniego (linie wychodzą)
+        int numLines = 24;
+        // Linie wychodzące z (+)
         for (int i = 0; i < numLines; i++) {
             double lineAngle = 2 * Math.PI * i / numLines;
             drawOneFieldLineWithArrows(g2d, charge1X, charge1Y, lineAngle, 1.0);
         }
-        // Pętla dla ładunku ujemnego (linie wchodzą - stąd sign = -1.0)
+        // Linie wchodzące do (-) - rysowane "pod prąd"
         for (int i = 0; i < numLines; i++) {
             double lineAngle = 2 * Math.PI * i / numLines;
             drawOneFieldLineWithArrows(g2d, charge2X, charge2Y, lineAngle, -1.0);
         }
     }
-    // --- KLUCZOWY ALGORYTM RYSOWANIA LINII POLA ---
+
+    // --- KLUCZOWY ALGORYTM RYSOWANIA LINII I STRZAŁEK ---
     private void drawOneFieldLineWithArrows(Graphics2D g2d, double startX, double startY,
                                             double directionAngle, double sign) {
         ArrayList<Point2D.Double> points = new ArrayList<>();
@@ -100,29 +100,24 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
         double y = startY + 10 * Math.sin(directionAngle);
         double step = 3.0;
         int maxSteps = 200;
-        int arrowCounter = 0;
 
+        // 1. Rysowanie samej linii (ścieżki)
         for (int i = 0; i < maxSteps; i++) {
-            // 1. Oblicz wektor pola E w obecnym punkcie (x, y)
             double[] field = calculateFieldAt(x, y);
             double ex = field[0];
             double ey = field[1];
-             // 2. Oblicz długość wektora
+
             double magnitude = Math.sqrt(ex * ex + ey * ey);
             if (magnitude < 0.1) break;
 
-            // 3. Oblicz przesunięcie (dx, dy) znormalizowane do długości kroku
-            // sign decyduje czy idziemy zgodnie z polem czy pod prąd
+            // sign decyduje czy rysujemy linię zgodnie z polem czy "pod prąd"
             double dx = sign * step * ex / magnitude;
             double dy = sign * step * ey / magnitude;
 
             double nextX = x + dx;
             double nextY = y + dy;
 
-            // 4. Narysuj mały odcinek
             g2d.drawLine((int)x, (int)y, (int)nextX, (int)nextY);
-
-
             points.add(new Point2D.Double(x, y));
 
             x = nextX;
@@ -133,96 +128,78 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
             if (Math.abs(x - charge2X) < 10 && Math.abs(y - charge2Y) < 10) break;
         }
 
+        // 2. Rysowanie strzałek na linii (POPRAWIONE)
+        // Teraz obliczamy rzeczywisty wektor pola w punkcie strzałki,
+        // zamiast polegać na kierunku rysowania linii.
+        for (int i = 10; i < points.size(); i += 20) {
+            Point2D.Double p = points.get(i);
 
-        points.add(new Point2D.Double(x, y));
+            // OBLICZ PRAWDZIWY WEKTOR POLA W TYM PUNKCIE
+            double[] field = calculateFieldAt(p.x, p.y);
+            double ex = field[0];
+            double ey = field[1];
 
+            // Kąt rzeczywistego pola elektrycznego (zawsze od + do -)
+            double fieldAngle = Math.atan2(ey, ex);
 
-        for (int i = 0; i < points.size() - 1; i += 15) {
-            if (i + 1 < points.size()) {
-                Point2D.Double p1 = points.get(i);
-                Point2D.Double p2 = points.get(i + 1);
-                // Oblicz kąt strzałki na podstawie kierunku linii
-                double angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-                drawElectricArrow(g2d, p1.x, p1.y, angle, 8);
-            }
+            drawElectricArrow(g2d, p.x, p.y, fieldAngle, 8);
         }
     }
 
     private void drawElectricArrow(Graphics2D g2d, double x, double y, double angle, double size) {
-        double endX = x + size * Math.cos(angle);
-        double endY = y + size * Math.sin(angle);
+        // Rysowanie trójkątnej strzałki
+        double arrowAngle1 = angle - Math.PI/7;
+        double arrowAngle2 = angle + Math.PI/7;
+        double arrowLength = size;
 
-
-        double arrowAngle1 = angle - Math.PI/6;
-        double arrowAngle2 = angle + Math.PI/6;
-        double arrowLength = size * 0.8;
-
-        double x1 = x + arrowLength * Math.cos(arrowAngle1);
-        double y1 = y + arrowLength * Math.sin(arrowAngle1);
-        double x2 = x + arrowLength * Math.cos(arrowAngle2);
-        double y2 = y + arrowLength * Math.sin(arrowAngle2);
-
+        double x1 = x - arrowLength * Math.cos(arrowAngle1);
+        double y1 = y - arrowLength * Math.sin(arrowAngle1);
+        double x2 = x - arrowLength * Math.cos(arrowAngle2);
+        double y2 = y - arrowLength * Math.sin(arrowAngle2);
 
         int[] xPoints = {(int)x, (int)x1, (int)x2};
         int[] yPoints = {(int)y, (int)y1, (int)y2};
 
         g2d.setColor(new Color(255, 150, 150, 220));
         g2d.fillPolygon(xPoints, yPoints, 3);
-        g2d.setColor(new Color(255, 100, 100, 200));
-        g2d.drawPolygon(xPoints, yPoints, 3);
     }
-    // Rysuje pole magnetyczne jako okręgi
-    private void drawMagneticFieldCircles(Graphics2D g2d) {
 
+    private void drawMagneticFieldCircles(Graphics2D g2d) {
         g2d.setColor(new Color(100, 150, 255, 120));
         g2d.setStroke(new BasicStroke(1.5f));
 
         int numCircles = 8;
         for (int i = 1; i <= numCircles; i++) {
             double radius = 40 * i;
-
-
             float[] dash = {5, 5};
             g2d.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT,
                     BasicStroke.JOIN_BEVEL, 0, dash, 0));
-
-            g2d.draw(new Ellipse2D.Double(
-                    centerX - radius, centerY - radius,
-                    radius * 2, radius * 2
-            ));
+            g2d.draw(new Ellipse2D.Double(centerX - radius, centerY - radius, radius * 2, radius * 2));
         }
-        // Dodawanie strzałek do pola magnetycznego
+        // Strzałki pola magnetycznego
         g2d.setColor(new Color(150, 200, 255, 180));
         g2d.setStroke(new BasicStroke(1.5f));
-
         int numArrows = 24;
         double magRadius = 120;
         for (int i = 0; i < numArrows; i++) {
             double circAngle = 2 * Math.PI * i / numArrows;
             double x = centerX + magRadius * Math.cos(circAngle);
             double y = centerY + magRadius * Math.sin(circAngle);
-
-
             double tangentAngle = circAngle + Math.PI/2;
             drawMagneticArrow(g2d, x, y, tangentAngle, 10);
         }
     }
 
     private void drawMagneticArrow(Graphics2D g2d, double x, double y, double angle, double size) {
-
         double endX = x + size * Math.cos(angle);
         double endY = y + size * Math.sin(angle);
-
-
         double arrowAngle1 = angle - Math.PI/6;
         double arrowAngle2 = angle + Math.PI/6;
         double arrowLength = size * 0.6;
-
         double x1 = endX - arrowLength * Math.cos(arrowAngle1);
         double y1 = endY - arrowLength * Math.sin(arrowAngle1);
         double x2 = endX - arrowLength * Math.cos(arrowAngle2);
         double y2 = endY - arrowLength * Math.sin(arrowAngle2);
-
         g2d.drawLine((int)endX, (int)endY, (int)x1, (int)y1);
         g2d.drawLine((int)endX, (int)endY, (int)x2, (int)y2);
     }
@@ -231,45 +208,41 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
         g2d.setColor(new Color(200, 200, 200));
         g2d.setStroke(new BasicStroke(2.0f));
         g2d.drawLine((int)charge1X, (int)charge1Y, (int)charge2X, (int)charge2Y);
-        // Ładunek dodatni (+) - Czerwony
+        // Ładunek dodatni (+)
         g2d.setColor(new Color(255, 100, 100));
         g2d.fillOval((int)charge1X - 12, (int)charge1Y - 12, 24, 24);
         g2d.setColor(Color.WHITE);
         g2d.setFont(new Font("Arial", Font.BOLD, 16));
         drawCenteredString(g2d, "+", charge1X, charge1Y);
-        // Ładunek ujemny (-) - Niebieski
+        // Ładunek ujemny (-)
         g2d.setColor(new Color(100, 100, 255));
         g2d.fillOval((int)charge2X - 12, (int)charge2Y - 12, 24, 24);
         drawCenteredString(g2d, "-", charge2X, charge2Y);
     }
-        // Rysuje napisy informacyjne i legendę
+
     private void drawLabels(Graphics2D g2d) {
         g2d.setColor(Color.WHITE);
         g2d.setFont(new Font("Arial", Font.BOLD, 20));
         g2d.drawString("Dipole Electric & Magnetic Field", 20, 30);
-
         g2d.setFont(new Font("Monospaced", Font.PLAIN, 16));
-        g2d.drawString("E = -∇V", 20, 60); // Gradient potencjału
-        g2d.drawString("B = ∇ × A", 20, 85); // Rotacja potencjału wektorowego
+        g2d.drawString("E = -∇V", 20, 60);
+        g2d.drawString("B = ∇ × A", 20, 85);
 
-        // Legenda pola elektrycznego
         g2d.setColor(new Color(255, 100, 100));
         g2d.fillPolygon(new int[]{20, 25, 30}, new int[]{HEIGHT-100, HEIGHT-110, HEIGHT-100}, 3);
         g2d.setColor(Color.WHITE);
         g2d.drawString("Electric Field (E) →", 35, HEIGHT-95);
-        // Legenda pola magnetycznego
+
         g2d.setColor(new Color(100, 150, 255));
         float[] dash = {5, 5};
-        g2d.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT,
-                BasicStroke.JOIN_BEVEL, 0, dash, 0));
+        g2d.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, dash, 0));
         g2d.drawOval(20, HEIGHT-85, 15, 15);
         g2d.setColor(Color.WHITE);
         g2d.drawString("Magnetic Field (B)", 40, HEIGHT-75);
 
-
         g2d.setFont(new Font("Arial", Font.ITALIC, 12));
-        g2d.drawString("E field direction: + → -", WIDTH-180, HEIGHT-30);
-
+        // Poprawiony napis w legendzie
+        g2d.drawString("E field direction: + (Red) → - (Blue)", WIDTH-220, HEIGHT-30);
 
         g2d.setFont(new Font("Arial", Font.BOLD, 18));
         g2d.drawString("Diplo 143 → 145", WIDTH/2 - 70, HEIGHT - 20);
@@ -277,28 +250,32 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
 
     private void drawCenteredString(Graphics2D g2d, String text, double x, double y) {
         FontMetrics fm = g2d.getFontMetrics();
+        drawCenteredString(g2d, text, x, y, fm);
+    }
+
+    private void drawCenteredString(Graphics2D g2d, String text, double x, double y, FontMetrics fm) {
         int textWidth = fm.stringWidth(text);
         int textHeight = fm.getAscent();
         g2d.drawString(text, (float)(x - textWidth/2), (float)(y + textHeight/2 - 5));
     }
-                // --- FIZYKA: OBLICZENIA POLA ---
-    // Oblicza wektor natężenia pola E w punkcie (x, y)
-    // Wykorzystuje ZASADĘ SUPERPOZYCJI (sumowanie wektorów od obu ładunków)
+
+    // --- FIZYKA: OBLICZENIA POLA ---
     private double[] calculateFieldAt(double x, double y) {
         double k = 1000.0;
-       // Odległość i wektor do ładunku 1 (+)
+        // Wektor od ładunku 1 (+) do punktu (x,y)
         double dx1 = x - charge1X;
         double dy1 = y - charge1Y;
         double r1 = Math.sqrt(dx1*dx1 + dy1*dy1);
-        double r1_cubed = r1 * r1 * r1;
-        // Odległość i wektor do ładunku 2 (-)
+        double r1_cubed = r1 * r1 * r1 + 0.1; // +0.1 unika dzielenia przez zero
+
+        // Wektor od ładunku 2 (-) do punktu (x,y)
         double dx2 = x - charge2X;
         double dy2 = y - charge2Y;
         double r2 = Math.sqrt(dx2*dx2 + dy2*dy2);
-        double r2_cubed = r2 * r2 * r2;
-        // Sumowanie wkładów (Prawo Coulomba)
-        // Pole od (+) odpycha, pole od (-) przyciąga
+        double r2_cubed = r2 * r2 * r2 + 0.1;
 
+        // Superpozycja pól. Pole od (+) jest skierowane zgodnie z wektorem (dx1, dy1).
+        // Pole od (-) jest skierowane przeciwnie do wektora (dx2, dy2), stąd minus.
         double ex = k * (dx1/r1_cubed - dx2/r2_cubed);
         double ey = k * (dy1/r1_cubed - dy2/r2_cubed);
 
@@ -307,16 +284,15 @@ public class SimpleDipoleField extends JPanel implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        angle += 0.01; // Zwiększ kąt obrotu
-        calculatePositions(); // Przelicz pozycje
-        repaint(); // Przerysuj ekran
+        angle += 0.01;
+        calculatePositions();
+        repaint();
     }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("Dipole Field with Arrows");
+            JFrame frame = new JFrame("Dipole Field Corrected");
             SimpleDipoleField panel = new SimpleDipoleField();
-
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             frame.add(panel);
             frame.pack();
